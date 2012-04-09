@@ -1,0 +1,4 @@
+This cert-tool Perl script provides command-line options for generating
+certs/keys using the OpenSSL command-line tools and config file.
+
+For further module documentation, see cert-tool.html.
