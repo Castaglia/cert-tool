@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # --------------------------------------------------------------------------
-# Copyright (C) 2000-2012 TJ Saunders <tj@castaglia.org>
+# Copyright (C) 2000-2013 TJ Saunders <tj@castaglia.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@ my $verbose = 0;
 my $openssl = 'openssl';
 my $c_rehash = 'c_rehash';
 
+my $cert_tool_default_digest = 'sha1';
 my $cert_tool_home = '/usr/local/cert-tool';
 my $cert_tool_key_len = 2048;
 my $cert_tool_days_valid = 365;
@@ -42,7 +43,7 @@ my ($config_path, $index_path, $rand_path, $serial_path);
 
 my %opts = ();
 GetOptions(\%opts, 'combined', 'common-name=s', 'create-ca=s', 'create-cert=s',
-  'days-valid=i', 'help', 'key-cipher=s', 'key-length=i',
+  'days-valid=i', 'hash=s', 'help', 'key-cipher=s', 'key-length=i',
   'signing-ca=s', 'signing-key=s', 'quiet', 'verbose',
   'verify-cert=s', 'verifying-ca=s', 'verifying-key=s', 'with-csr=s');
 
@@ -170,10 +171,10 @@ if (exists($opts{'create-cert'})) {
 
     # Prompt for the values for some X509v3 subjectAltName attributes.
     print STDOUT "$program: X509v3 subjectAltName emailAddress: ";
-    chomp($ENV{'CERT_TOOL_ALT_EMAIL'} = <STDIN>);
+    chomp($ENV{CERT_TOOL_ALT_EMAIL} = <STDIN>);
 
     print STDOUT "$program: X509v3 subjectAltName uniformResourceIdentifier: ";
-    chomp($ENV{'CERT_TOOL_ALT_URI'} = <STDIN>);
+    chomp($ENV{CERT_TOOL_ALT_URI} = <STDIN>);
 
     generate_CSR(
       'name' => $opts{'create-cert'},
@@ -267,8 +268,8 @@ sub generate_CSR {
   # Use the environment to pass in the custom/arbitrary name of the cert
   # being required as the commonName.  This name should be something like the
   # hostname or IP address of the requesting entity.
-  $ENV{'CERT_TOOL_COMMON_NAME'} = $args{'name'};
-  $ENV{'CERT_TOOL_COMMON_NAME'} = $opts{'common-name'} if
+  $ENV{CERT_TOOL_COMMON_NAME} = $args{'name'};
+  $ENV{CERT_TOOL_COMMON_NAME} = $opts{'common-name'} if
     defined($opts{'common-name'});
 
   # Generate the new CSR.
@@ -320,8 +321,8 @@ sub generate_root_CA_cert {
 
   # Note: by default, make the root CA good for two years.
   my $days = 730;
-  if (defined($ENV{'CERT_TOOL_DAYS_VALID'})) {
-    $days = $ENV{'CERT_TOOL_DAYS_VALID'};
+  if (defined($ENV{CERT_TOOL_DAYS_VALID})) {
+    $days = $ENV{CERT_TOOL_DAYS_VALID};
   }
 
   my $cert_file = $args{'cert_file'};
@@ -330,23 +331,23 @@ sub generate_root_CA_cert {
   # Use the environment to pass in the custom/arbitrary name of the cert
   # being required as the commonName.  This name should be something like the
   # hostname or IP address of the requesting entity.
-  $ENV{'CERT_TOOL_COMMON_NAME'} = $args{'name'};
-  $ENV{'CERT_TOOL_COMMON_NAME'} = $opts{'common-name'} if
+  $ENV{CERT_TOOL_COMMON_NAME} = $args{'name'};
+  $ENV{CERT_TOOL_COMMON_NAME} = $opts{'common-name'} if
     defined($opts{'common-name'});
 
   # Note: this hack allows for the twiddling of the serial number of the
   # generated self-signed cert.  This means that openssl-0.9.7-beta2 or
   # later must be used, as that is when the -set_serial option was introduced.
-  $ENV{'CERT_TOOL_ROOT_CA_SERIAL'} = '0x0' unless
-    exists($ENV{'CERT_TOOL_ROOT_CA_SERIAL'});
+  $ENV{CERT_TOOL_ROOT_CA_SERIAL} = '0x0' unless
+    exists($ENV{CERT_TOOL_ROOT_CA_SERIAL});
 
   # The -x509 option directs req to generate a self-signed CA certificate.
-  execute_command("req -config $config_path -new -x509 -days $days -key $key_file -set_serial $ENV{'CERT_TOOL_ROOT_CA_SERIAL'} -out $cert_file", 0);
+  execute_command("req -config $config_path -new -x509 -days $days -key $key_file -set_serial $ENV{CERT_TOOL_ROOT_CA_SERIAL} -out $cert_file", 0);
 }
 
 # --------------------------------------------------------------------------
 sub prepare_config_file {
-  $config_path = "$ENV{'CERT_TOOL_HOME'}/etc/cert-tool.conf";
+  $config_path = "$ENV{CERT_TOOL_HOME}/etc/cert-tool.conf";
 
   print STDOUT "$program: writing '$config_path'\n" if $quiet;
 
@@ -364,22 +365,39 @@ sub prepare_config_file {
 
 # --------------------------------------------------------------------------
 sub prepare_environ {
-  $ENV{'CERT_TOOL_HOME'} = $cert_tool_home
-    unless exists($ENV{'CERT_TOOL_HOME'});
+  $ENV{CERT_TOOL_HOME} = $cert_tool_home
+    unless exists($ENV{CERT_TOOL_HOME});
 
-  $ENV{'CERT_TOOL_DAYS_VALID'} = $cert_tool_days_valid;
-  $ENV{'CERT_TOOL_DAYS_VALID'} = $opts{'days-valid'}
+  $ENV{CERT_TOOL_DAYS_VALID} = $cert_tool_days_valid;
+  $ENV{CERT_TOOL_DAYS_VALID} = $opts{'days-valid'}
     if exists($opts{'days-valid'});
 
-  $ENV{'CERT_TOOL_KEY_LEN'} = $cert_tool_key_len;
-  $ENV{'CERT_TOOL_KEY_LEN'} = $opts{'key-length'}
+  $ENV{CERT_TOOL_KEY_LEN} = $cert_tool_key_len;
+  $ENV{CERT_TOOL_KEY_LEN} = $opts{'key-length'}
     if exists($opts{'key-length'});
 
+  my $cert_tool_digest = $cert_tool_default_digest;
+
+  # Check whether OpenSSL supports SHA-256
+  eval { execute_command("list-message-digest-algorithms | grep SHA256") };
+  unless ($@) {
+    $cert_tool_digest = 'sha256';
+  }
+
+  $ENV{CERT_TOOL_DIGEST} = $cert_tool_digest;
+  $ENV{CERT_TOOL_DIGEST} = $opts{'hash'}
+    if exists($opts{'hash'});
+
   # Need to fill in default values for some X509v3 subjectAltName attributes.
-  $ENV{'CERT_TOOL_ALT_DNS'} = "";
-  $ENV{'CERT_TOOL_ALT_EMAIL'} = "";
-  $ENV{'CERT_TOOL_ALT_IP'} = "";
-  $ENV{'CERT_TOOL_ALT_URI'} = "";
+#  $ENV{'CERT_TOOL_ALT_DNS'} = "";
+#  $ENV{'CERT_TOOL_ALT_EMAIL'} = "";
+#  $ENV{'CERT_TOOL_ALT_IP'} = "";
+#  $ENV{'CERT_TOOL_ALT_URI'} = "";
+
+  $ENV{CERT_TOOL_ALT_DNS} = 'www.castaglia.org';
+  $ENV{CERT_TOOL_ALT_EMAIL} = 'tj@castaglia.org';
+  $ENV{CERT_TOOL_ALT_IP} = '::ffff:127.0.0.1';
+  $ENV{CERT_TOOL_ALT_URI} = 'http://www.castaglia.org/';
 }
 
 # --------------------------------------------------------------------------
@@ -592,6 +610,12 @@ Options:
       Configures the number of days for which the generated certificate will
       be valid.  Defaults to 365 days (1 year).
 
+  --hash
+
+      Configures the message digest/hash algorithm to use.  If your OpenSSL
+      installation supports SHA256, that will be the default (otherwise, a
+      default of SHA1 is used).  Use this parameter to override the default.
+
   --help
 
       Displays this message.
@@ -659,7 +683,7 @@ cert_tool_home = $ENV::CERT_TOOL_HOME
 certificate = $cert_tool_home/cert-tool.cert.pem
 database = $cert_tool_home/etc/cert-tool.index
 default_days = $ENV::CERT_TOOL_DAYS_VALID
-default_md = sha1
+default_md = $ENV::CERT_TOOL_DIGEST
 new_certs_dir = $cert_tool_home
 policy = cert_tool_ca_policy
 preserve = yes
@@ -679,6 +703,7 @@ stateOrProvinceName = match
 [ req ]
 default_bits = $ENV::CERT_TOOL_KEY_LEN
 default_keyfile = key.pem
+default_md = $ENV::CERT_TOOL_DIGEST
 distinguished_name = cert_tool_distinguished_name
 prompt = no
 string_mask = nombstr   
@@ -713,7 +738,7 @@ authorityInfoAccess = OCSP;URI:$ENV::CERT_TOOL_AIA_OCSP_URI
 authorityKeyIdentifier = keyid:always,issuer:always
 
 [ cert_tool_alt_name ]
-DNS = $ENV::CERT_TOOL_ALT_DN
+DNS = $ENV::CERT_TOOL_ALT_DNS
 email = $ENV::CERT_TOOL_ALT_EMAIL
 IP = $ENV::CERT_TOOL_ALT_IP
 URI = $ENV::CERT_TOOL_ALT_URI
