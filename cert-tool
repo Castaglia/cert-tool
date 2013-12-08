@@ -285,6 +285,7 @@ sub generate_key {
 
   my $cipher_opt = "";
   my $redirect = 0;
+  my $use_ec = 0;
 
   if (exists($opts{'key-cipher'})) {
     $redirect = 1;
@@ -298,12 +299,21 @@ sub generate_key {
     } elsif ($opts{'key-cipher'} eq "idea") {
       $cipher_opt = "-idea";
 
+    } elsif ($opts{'key-cipher'} =~ /^ec:/i) {
+      $cipher_opt = $opts{'key-cipher'};
+      $cipher_opt =~ s/^ec://i;
+      $use_ec = 1;
+
     } else {
       die "$program: unsupported private key cipher option: $opts{'key-cipher'}\n";
     }
   }
 
-  if (defined($ENV{CERT_TOOL_USE_DSA})) {
+  if ($use_ec) {
+    print STDOUT "$program: generating EC key file\n" if $quiet;
+    execute_command("ecparam -genkey -out $output_file -name $cipher_opt");
+
+  } elsif (defined($ENV{CERT_TOOL_USE_DSA})) {
     print STDOUT "$program: generating DSA key file\n" if $quiet;
     execute_command("dsaparam -genkey -out dsaparam.pem $cert_tool_key_len");
     execute_command("gendsa -rand $rand_file $cipher_opt -out $output_file dsaparam.pem");
@@ -725,14 +735,14 @@ nsComment = "CertTool Certificate"
 subjectAltName = @cert_tool_alt_name
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer:always
-authorityInfoAccess = OCSP;URI:$ENV::CERT_TOOL_AIA_OCSP_URI
+#authorityInfoAccess = OCSP;URI:$ENV::CERT_TOOL_AIA_OCSP_URI
 
 [ cert_tool_x509_ca_ext ]
 basicConstraints = CA:TRUE
 subjectAltName = @cert_tool_ca_alt_name
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer:always
-authorityInfoAccess = OCSP;URI:$ENV::CERT_TOOL_AIA_OCSP_URI
+#authorityInfoAccess = OCSP;URI:$ENV::CERT_TOOL_AIA_OCSP_URI
 
 [ crl_ext ]
 authorityKeyIdentifier = keyid:always,issuer:always
