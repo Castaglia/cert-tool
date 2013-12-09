@@ -299,9 +299,9 @@ sub generate_key {
     } elsif ($opts{'key-cipher'} eq "idea") {
       $cipher_opt = "-idea";
 
-    } elsif ($opts{'key-cipher'} =~ /^ec:/i) {
+    } elsif ($opts{'key-cipher'} =~ /^(ec|curve):/i) {
       $cipher_opt = $opts{'key-cipher'};
-      $cipher_opt =~ s/^ec://i;
+      $cipher_opt =~ s/^(ec|curve)://i;
       $use_ec = 1;
 
     } else {
