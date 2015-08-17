@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # --------------------------------------------------------------------------
-# Copyright (C) 2000-2013 TJ Saunders <tj@castaglia.org>
+# Copyright (C) 2000-2015 TJ Saunders <tj@castaglia.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,8 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Suite 500, Boston, MA 02110-1335, USA.
-#
-#  $Id: cert-tool,v 1.11 2002/12/06 23:20:58 tj Exp tj $
 # --------------------------------------------------------------------------
 
 use strict;
@@ -86,6 +84,9 @@ if (exists($opts{'create-ca'})) {
   );
 
   if ($opts{'signing-ca'} eq "self") {
+    prompt_user('X509v3 authorityInfoAccess OCSP URI',
+      'CERT_TOOL_AIA_OCSP_URI');
+
     generate_root_CA_cert(
       'name' => $opts{'create-ca'},
       'cert_file' => $cert_file,
@@ -100,7 +101,6 @@ if (exists($opts{'create-ca'})) {
     }
     
   } else {
-
     unless (-r $opts{'signing-ca'}) {
       die "$program: error: unable to read CA file $opts{'signing-ca'}\n";
     }
@@ -111,6 +111,9 @@ if (exists($opts{'create-ca'})) {
 
     # Generate a CSR, unless one was explicitly given.
     unless (exists($opts{'with-csr'})) {
+      prompt_user('X509v3 authorityInfoAccess OCSP URI',
+        'CERT_TOOL_AIA_OCSP_URI');
+
       generate_CSR(
         'name' => $opts{'create-ca'},
         'key_file' => $key_file,
@@ -168,13 +171,11 @@ if (exists($opts{'create-cert'})) {
 
   # Generate a CSR, unless one was explicitly given.
   unless (exists($opts{'with-csr'})) {
-
-    # Prompt for the values for some X509v3 subjectAltName attributes.
-    print STDOUT "$program: X509v3 subjectAltName emailAddress: ";
-    chomp($ENV{CERT_TOOL_ALT_EMAIL} = <STDIN>);
-
-    print STDOUT "$program: X509v3 subjectAltName uniformResourceIdentifier: ";
-    chomp($ENV{CERT_TOOL_ALT_URI} = <STDIN>);
+    prompt_user('X509v3 subjectAltName emailAddress', 'CERT_TOOL_ALT_EMAIL');
+    prompt_user('X509v3 subjectAltName uniformResourceIdentifier',
+      'CERT_TOOL_ALT_URI');
+    prompt_user('X509v3 authorityInfoAccess OCSP URI',
+      'CERT_TOOL_AIA_OCSP_URI');
 
     generate_CSR(
       'name' => $opts{'create-cert'},
@@ -398,15 +399,18 @@ sub prepare_environ {
   $ENV{CERT_TOOL_DIGEST} = $opts{'hash'}
     if exists($opts{'hash'});
 
-  # Need to fill in default values for some X509v3 subjectAltName attributes.
-#  $ENV{'CERT_TOOL_ALT_DNS'} = "";
-#  $ENV{'CERT_TOOL_ALT_EMAIL'} = "";
-#  $ENV{'CERT_TOOL_ALT_IP'} = "";
-#  $ENV{'CERT_TOOL_ALT_URI'} = "";
+  # Need to fill in default values for some X509v3 AIA (authorityInfoAccess)
+  # and SAN (subjectAltName) attributes.
+#  $ENV{CERT_TOOL_AIA_OCSP_URI} = "";
+#  $ENV{CERT_TOOL_ALT_DNS} = "";
+#  $ENV{CERT_TOOL_ALT_EMAIL} = "";
+#  $ENV{CERT_TOOL_ALT_IP} = "";
+#  $ENV{CERT_TOOL_ALT_URI} = "";
 
+  $ENV{CERT_TOOL_AIA_OCSP_URI} = 'http://ocsp.castaglia.org/';
   $ENV{CERT_TOOL_ALT_DNS} = 'www.castaglia.org';
   $ENV{CERT_TOOL_ALT_EMAIL} = 'tj@castaglia.org';
-  $ENV{CERT_TOOL_ALT_IP} = '::ffff:127.0.0.1';
+  $ENV{CERT_TOOL_ALT_IP} = '127.0.0.1';
   $ENV{CERT_TOOL_ALT_URI} = 'http://www.castaglia.org/';
 }
 
@@ -510,6 +514,19 @@ sub prepare_tool {
 
   # Prepare a randomness seed file.
   prepare_rand_file();
+}
+
+# --------------------------------------------------------------------------
+sub prompt_user {
+  my $prompt = shift;
+  my $env_key = shift;
+
+  print STDOUT "$program: $prompt: ";
+  my $env_val = <STDIN>;
+  chomp($env_val);
+  if (length($env_val) > 0) {
+    $ENV{$env_key} = $env_val;
+  }
 }
 
 # --------------------------------------------------------------------------
@@ -735,14 +752,14 @@ nsComment = "CertTool Certificate"
 subjectAltName = @cert_tool_alt_name
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer:always
-#authorityInfoAccess = OCSP;URI:$ENV::CERT_TOOL_AIA_OCSP_URI
+authorityInfoAccess = OCSP;URI:$ENV::CERT_TOOL_AIA_OCSP_URI
 
 [ cert_tool_x509_ca_ext ]
 basicConstraints = CA:TRUE
 subjectAltName = @cert_tool_ca_alt_name
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer:always
-#authorityInfoAccess = OCSP;URI:$ENV::CERT_TOOL_AIA_OCSP_URI
+authorityInfoAccess = OCSP;URI:$ENV::CERT_TOOL_AIA_OCSP_URI
 
 [ crl_ext ]
 authorityKeyIdentifier = keyid:always,issuer:always
