@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # --------------------------------------------------------------------------
-# Copyright (C) 2000-2015 TJ Saunders <tj@castaglia.org>
+# Copyright (C) 2000-2016 TJ Saunders <tj@castaglia.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@ my $verbose = 0;
 my $openssl = 'openssl';
 my $c_rehash = 'c_rehash';
 
-my $cert_tool_default_digest = 'sha1';
+my $cert_tool_default_digest = 'sha256';
 my $cert_tool_home = '/usr/local/cert-tool';
 my $cert_tool_key_len = 2048;
 my $cert_tool_days_valid = 365;
@@ -172,6 +172,7 @@ if (exists($opts{'create-cert'})) {
   # Generate a CSR, unless one was explicitly given.
   unless (exists($opts{'with-csr'})) {
     prompt_user('X509v3 subjectAltName emailAddress', 'CERT_TOOL_ALT_EMAIL');
+    prompt_user('X509v3 subjectAltName dNSName', 'CERT_TOOL_ALT_DNS');
     prompt_user('X509v3 subjectAltName uniformResourceIdentifier',
       'CERT_TOOL_ALT_URI');
     prompt_user('X509v3 authorityInfoAccess OCSP URI',
