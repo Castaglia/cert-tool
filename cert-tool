@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # --------------------------------------------------------------------------
-# Copyright (C) 2000-2016 TJ Saunders <tj@castaglia.org>
+# Copyright (C) 2000-2017 TJ Saunders <tj@castaglia.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -36,14 +36,15 @@ my $c_rehash = 'c_rehash';
 my $cert_tool_default_digest = 'sha256';
 my $cert_tool_home = '/usr/local/cert-tool';
 my $cert_tool_key_len = 2048;
-my $cert_tool_days_valid = 365;
+my $cert_tool_days_valid = 1095;
 my ($config_path, $index_path, $rand_path, $serial_path);
 
 my %opts = ();
-GetOptions(\%opts, 'combined', 'common-name=s', 'create-ca=s', 'create-cert=s',
-  'days-valid=i', 'hash=s', 'help', 'key-cipher=s', 'key-length=i',
-  'signing-ca=s', 'signing-key=s', 'quiet', 'verbose',
-  'verify-cert=s', 'verifying-ca=s', 'verifying-key=s', 'with-csr=s');
+GetOptions(\%opts, 'client-eku', 'combined', 'common-name=s', 'create-ca=s',
+  'create-cert=s', 'days-valid=i', 'hash=s', 'help', 'key-cipher=s',
+  'key-length=i', 'server-eku', 'signing-ca=s', 'signing-key=s', 'quiet',
+  'verbose', 'verify-cert=s', 'verifying-ca=s', 'verifying-key=s',
+  'with-csr=s');
 
 usage() if exists($opts{'help'});
 
@@ -413,6 +414,20 @@ sub prepare_environ {
   $ENV{CERT_TOOL_ALT_EMAIL} = 'tj@castaglia.org';
   $ENV{CERT_TOOL_ALT_IP} = '127.0.0.1';
   $ENV{CERT_TOOL_ALT_URI} = 'http://www.castaglia.org/';
+
+  # Safe default, to provide _something_ for the OpenSSL config.
+  $ENV{CERT_TOOL_EKU} = 'emailProtection';
+
+  if (exists($opts{'server-eku'}) &&
+      exists($opts{'client-eku'})) {
+    $ENV{CERT_TOOL_EKU} = 'serverAuth,clientAuth';
+
+  } elsif (exists($opts{'server-eku'})) {
+    $ENV{CERT_TOOL_EKU} = 'serverAuth';
+
+  } elsif (exists($opts{'client-eku'})) {
+    $ENV{CERT_TOOL_EKU} = 'clientAuth';
+  }
 }
 
 # --------------------------------------------------------------------------
@@ -754,6 +769,8 @@ subjectAltName = @cert_tool_alt_name
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer:always
 authorityInfoAccess = OCSP;URI:$ENV::CERT_TOOL_AIA_OCSP_URI
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = $ENV::CERT_TOOL_EKU
 
 [ cert_tool_x509_ca_ext ]
 basicConstraints = CA:TRUE
@@ -761,6 +778,7 @@ subjectAltName = @cert_tool_ca_alt_name
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer:always
 authorityInfoAccess = OCSP;URI:$ENV::CERT_TOOL_AIA_OCSP_URI
+keyUsage = critical,keyCertSign,cRLSign
 
 [ crl_ext ]
 authorityKeyIdentifier = keyid:always,issuer:always
