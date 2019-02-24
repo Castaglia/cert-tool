@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # --------------------------------------------------------------------------
-# Copyright (C) 2000-2017 TJ Saunders <tj@castaglia.org>
+# Copyright (C) 2000-2019 TJ Saunders <tj@castaglia.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,11 +40,32 @@ my $cert_tool_days_valid = 1095;
 my ($config_path, $index_path, $rand_path, $serial_path);
 
 my %opts = ();
-GetOptions(\%opts, 'client-eku', 'combined', 'common-name=s', 'create-ca=s',
-  'create-cert=s', 'days-valid=i', 'hash=s', 'help', 'key-cipher=s',
-  'key-length=i', 'server-eku', 'signing-ca=s', 'signing-key=s', 'quiet',
-  'verbose', 'verify-cert=s', 'verifying-ca=s', 'verifying-key=s',
-  'with-csr=s');
+GetOptions(\%opts,
+  'client-eku',
+  'combined',
+  'common-name=s',
+  'country=s',
+  'create-ca=s',
+  'create-cert=s',
+  'days-valid=i',
+  'hash=s',
+  'help',
+  'key-cipher=s',
+  'key-length=i',
+  'locality=s',
+  'organization=s',
+  'organizational-unit=s',
+  'server-eku',
+  'signing-ca=s',
+  'signing-key=s',
+  'state=s',
+  'quiet',
+  'verbose',
+  'verify-cert=s',
+  'verifying-ca=s',
+  'verifying-key=s',
+  'with-csr=s'
+);
 
 usage() if exists($opts{'help'});
 
@@ -272,8 +293,12 @@ sub generate_CSR {
   # being required as the commonName.  This name should be something like the
   # hostname or IP address of the requesting entity.
   $ENV{CERT_TOOL_COMMON_NAME} = $args{'name'};
-  $ENV{CERT_TOOL_COMMON_NAME} = $opts{'common-name'} if
-    defined($opts{'common-name'});
+  $ENV{CERT_TOOL_COMMON_NAME} = $opts{'common-name'} if defined($opts{'common-name'});
+  $ENV{CERT_TOOL_COUNTRY} = $args{'country'} if defined($opts{'country'});
+  $ENV{CERT_TOOL_LOCALITY} = $args{'locality'} if defined($opts{'locality'});
+  $ENV{CERT_TOOL_ORG} = $args{'organization'} if defined($opts{'organization'});
+  $ENV{CERT_TOOL_ORG_UNIT} = $args{'organizational-unit'} if defined($opts{'organizational-unit'});
+  $ENV{CERT_TOOL_STATE} = $args{'state'} if defined($opts{'state'});
 
   # Generate the new CSR.
   print STDOUT "$program: generating CSR\n" if $quiet;
@@ -345,8 +370,12 @@ sub generate_root_CA_cert {
   # being required as the commonName.  This name should be something like the
   # hostname or IP address of the requesting entity.
   $ENV{CERT_TOOL_COMMON_NAME} = $args{'name'};
-  $ENV{CERT_TOOL_COMMON_NAME} = $opts{'common-name'} if
-    defined($opts{'common-name'});
+  $ENV{CERT_TOOL_COMMON_NAME} = $opts{'common-name'} if defined($opts{'common-name'});
+  $ENV{CERT_TOOL_COUNTRY} = $args{'country'} if defined($opts{'country'});
+  $ENV{CERT_TOOL_LOCALITY} = $args{'locality'} if defined($opts{'locality'});
+  $ENV{CERT_TOOL_ORG} = $args{'organization'} if defined($opts{'organization'});
+  $ENV{CERT_TOOL_ORG_UNIT} = $args{'organizational-unit'} if defined($opts{'organizational-unit'});
+  $ENV{CERT_TOOL_STATE} = $args{'state'} if defined($opts{'state'});
 
   # Note: this hack allows for the twiddling of the serial number of the
   # generated self-signed cert.  This means that openssl-0.9.7-beta2 or
@@ -428,6 +457,12 @@ sub prepare_environ {
   } elsif (exists($opts{'client-eku'})) {
     $ENV{CERT_TOOL_EKU} = 'clientAuth';
   }
+
+  $ENV{CERT_TOOL_COUNTRY} = 'US';
+  $ENV{CERT_TOOL_ORG_LOCALITY} = 'Seattle';
+  $ENV{CERT_TOOL_ORG_UNIT} = 'Research and Development';
+  $ENV{CERT_TOOL_ORG} = 'Castaglia';
+  $ENV{CERT_TOOL_STATE} = 'Washington';
 }
 
 # --------------------------------------------------------------------------
@@ -629,6 +664,10 @@ Options:
       certificate files into a single file, \$name.pem, certificate
       file first.  The key and certificate files are then deleted.
 
+  --country
+
+      Country name (C) of the Distinguished Name (DN).  Defaults to "US".
+
   --create-ca
 
       Create a new CA certificate.  Requires a name, e.g.:
@@ -675,6 +714,21 @@ Options:
 
       Configure the key length, in bits, to use.  Defaults to 1024.
 
+  --locality
+
+      Locality name (L) of the Distinguished Name (DN).  Defaults to
+      "Seattle".
+
+  --organization
+
+      Organization name (O) of the Distinguished Name (DN).  Defaults to
+      "Castaglia".
+
+  --organizational-unit
+
+      Organization Unit name (OU) of the Distinguished Name (DN).  Defaults to
+      "Research and Development".
+
   --quiet
 
       Displays the operations $program is undertaking.
@@ -688,6 +742,11 @@ Options:
 
       Path to the CA key to use for signing the certificate being generated.
       If generating a root CA certificate, this parameter is not required.
+
+  --state
+
+      State or province name (S) of the Distinguished Name (DN).  Defaults to
+      "Washington".
 
   --verbose
 
@@ -754,12 +813,11 @@ x509_extensions = cert_tool_x509_ca_ext
 
 [ cert_tool_distinguished_name ]
 commonName = $ENV::CERT_TOOL_COMMON_NAME
-countryName = US
-stateOrProvinceName = Washington
-localityName = Seattle
-0.organizationName = Castaglia
-0.organizationalUnitName = Research and Development
-1.organizationalUnitName = TJ Saunders
+countryName = $ENV::CERT_TOOL_COUNTRY
+stateOrProvinceName = $ENV::CERT_TOOL_STATE
+localityName = $ENV::CERT_TOOL_LOCALITY
+0.organizationName = $ENV::CERT_TOOL_ORG
+0.organizationalUnitName = $ENV::CERT_TOOL_ORG_UNIT
 emailAddress = tj@castaglia.org
 
 [ cert_tool_x509_ext ]
